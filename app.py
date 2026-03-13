@@ -1,3 +1,5 @@
+import os
+import gdown
 import tensorflow as tf
 import numpy as np
 from fastapi import FastAPI, File, UploadFile
@@ -6,21 +8,32 @@ import io
 
 app = FastAPI()
 
-# Load the trained model
-model = tf.keras.models.load_model("model.h5")
+MODEL_PATH = "model.h5"
 
-IMG_SIZE = 224   # change if your model used a different input size
+# Google Drive direct download link
+MODEL_URL = "https://drive.google.com/uc?id=1tCUvD3iEbWZU4UhijOa2kBXO78Xa0VDt"
+
+# Download model if it doesn't exist
+if not os.path.exists(MODEL_PATH):
+    print("Downloading model from Google Drive...")
+    gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+
+print("Loading model...")
+model = tf.keras.models.load_model(MODEL_PATH)
+
+IMG_SIZE = 224
 
 def preprocess_image(image):
     image = image.resize((IMG_SIZE, IMG_SIZE))
-    image = np.array(image)
-    image = image / 255.0
+    image = np.array(image) / 255.0
     image = np.expand_dims(image, axis=0)
     return image
+
 
 @app.get("/")
 def home():
     return {"message": "PCB Defect Detection API Running"}
+
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
@@ -28,18 +41,15 @@ async def predict(file: UploadFile = File(...)):
     contents = await file.read()
     image = Image.open(io.BytesIO(contents)).convert("RGB")
 
-    processed = preprocess_image(image)
+    img = preprocess_image(image)
 
-    prediction = model.predict(processed)
+    prediction = model.predict(img)
 
-    probability = float(prediction[0][0])
+    prob = float(prediction[0][0])
 
-    if probability > 0.5:
-        label = "Defect"
-    else:
-        label = "No Defect"
+    label = "Defect" if prob > 0.5 else "No Defect"
 
     return {
         "prediction": label,
-        "confidence": probability
+        "confidence": prob
     }
