@@ -1,26 +1,26 @@
 import os
 import gdown
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 from fastapi import FastAPI, File, UploadFile
 from PIL import Image
 import io
+from keras.models import load_model
 
 app = FastAPI()
 
 MODEL_PATH = "model.h5"
 
-# Google Drive direct download link
 MODEL_URL = "https://drive.google.com/uc?id=1tCUvD3iEbWZU4UhijOa2kBXO78Xa0VDt"
 
-# Download model if it doesn't exist
 if not os.path.exists(MODEL_PATH):
     print("Downloading model from Google Drive...")
     gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
 
 print("Loading model...")
-model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-IMG_SIZE = 224
+model = load_model(MODEL_PATH, compile=False, safe_mode=False)
+
+IMG_SIZE = 128
 
 def preprocess_image(image):
     image = image.resize((IMG_SIZE, IMG_SIZE))
@@ -28,11 +28,9 @@ def preprocess_image(image):
     image = np.expand_dims(image, axis=0)
     return image
 
-
 @app.get("/")
 def home():
     return {"message": "PCB Defect Detection API Running"}
-
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
