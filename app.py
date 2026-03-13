@@ -10,7 +10,7 @@ app = FastAPI(title="Disc Brake Defect Detection API")
 
 MODEL_PATH = "disc_brake_final_fixed.h5"
 
-MODEL_URL = "MODEL_URL = "https://drive.google.com/uc?id=1o7V9fmgQzCVRct1TOaZb8D5-170_YkQH""
+MODEL_URL ="https://drive.google.com/uc?id=1o7V9fmgQzCVRct1TOaZb8D5-170_YkQH"
 
 # Download model if not present
 if not os.path.exists(MODEL_PATH):
