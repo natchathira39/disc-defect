@@ -1,8 +1,8 @@
-fastapi
-uvicorn
-tensorflow==2.13.1
-numpy
-pillow
-python-multipart
-gdown
-h5py
+fastapi==0.115.0
+uvicorn==0.30.0
+tensorflow==2.19.0
+numpy==1.26.0
+pillow==10.0.0
+python-multipart==0.0.9
+gdown==5.2.0
+h5py==3.11.0
