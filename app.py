@@ -6,14 +6,15 @@ from fastapi import FastAPI, File, UploadFile
 from PIL import Image
 import io
 
-app = FastAPI()
+app = FastAPI(title="Disc Brake Defect Detection API")
 
-MODEL_PATH = "model.h5"
+MODEL_PATH = "disc_brake_final_deploy.h5"
+
 MODEL_URL = "https://drive.google.com/uc?id=1tCUvD3iEbWZU4UhijOa2kBXO78Xa0VDt"
 
 # Download model if not present
 if not os.path.exists(MODEL_PATH):
-    print("Downloading model...")
+    print("Downloading model from Google Drive...")
     gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
 
 print("Loading model...")
@@ -31,12 +32,14 @@ def preprocess_image(image):
 
 @app.get("/")
 def home():
-    return {"message": "Disc Defect Detection API Running"}
+    return {"message": "Disc Brake Defect Detection API Running"}
 
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
+
     contents = await file.read()
+
     image = Image.open(io.BytesIO(contents)).convert("RGB")
 
     img = preprocess_image(image)
@@ -45,7 +48,7 @@ async def predict(file: UploadFile = File(...)):
 
     prob = float(prediction[0][0])
 
-    label = "Defective Disc" if prob > 0.5 else "Normal Disc"
+    label = "Defective Disc Brake" if prob > 0.5 else "Normal Disc Brake"
 
     return {
         "prediction": label,
