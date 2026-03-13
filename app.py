@@ -5,22 +5,24 @@ import tensorflow as tf
 from fastapi import FastAPI, File, UploadFile
 from PIL import Image
 import io
-from keras.models import load_model
 
-app = FastAPI()
+app = FastAPI(title="Disc Defect Detection API")
 
 MODEL_PATH = "model.h5"
 
 MODEL_URL = "https://drive.google.com/uc?id=1tCUvD3iEbWZU4UhijOa2kBXO78Xa0VDt"
 
+# Download model if not present
 if not os.path.exists(MODEL_PATH):
     print("Downloading model from Google Drive...")
     gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
 
 print("Loading model...")
-model = load_model(MODEL_PATH, compile=False, safe_mode=False)
+model = tf.keras.models.load_model(MODEL_PATH, compile=False)
 
+# Model input size
 IMG_SIZE = 128
+
 
 def preprocess_image(image):
     image = image.resize((IMG_SIZE, IMG_SIZE))
@@ -28,14 +30,20 @@ def preprocess_image(image):
     image = np.expand_dims(image, axis=0)
     return image
 
+
 @app.get("/")
 def home():
-    return {"message": "PCB Defect Detection API Running"}
+    return {
+        "message": "Disc Defect Detection API Running",
+        "model_input_size": "128x128"
+    }
+
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
 
     contents = await file.read()
+
     image = Image.open(io.BytesIO(contents)).convert("RGB")
 
     img = preprocess_image(image)
@@ -44,7 +52,10 @@ async def predict(file: UploadFile = File(...)):
 
     prob = float(prediction[0][0])
 
-    label = "Defect" if prob > 0.5 else "No Defect"
+    if prob > 0.5:
+        label = "Defective Disc"
+    else:
+        label = "Normal Disc"
 
     return {
         "prediction": label,
