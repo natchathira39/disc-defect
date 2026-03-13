@@ -6,21 +6,19 @@ from fastapi import FastAPI, File, UploadFile
 from PIL import Image
 import io
 
-app = FastAPI(title="Disc Defect Detection API")
+app = FastAPI()
 
 MODEL_PATH = "model.h5"
-
 MODEL_URL = "https://drive.google.com/uc?id=1tCUvD3iEbWZU4UhijOa2kBXO78Xa0VDt"
 
 # Download model if not present
 if not os.path.exists(MODEL_PATH):
-    print("Downloading model from Google Drive...")
+    print("Downloading model...")
     gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
 
 print("Loading model...")
 model = tf.keras.models.load_model(MODEL_PATH, compile=False)
 
-# Model input size
 IMG_SIZE = 128
 
 
@@ -33,17 +31,12 @@ def preprocess_image(image):
 
 @app.get("/")
 def home():
-    return {
-        "message": "Disc Defect Detection API Running",
-        "model_input_size": "128x128"
-    }
+    return {"message": "Disc Defect Detection API Running"}
 
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-
     contents = await file.read()
-
     image = Image.open(io.BytesIO(contents)).convert("RGB")
 
     img = preprocess_image(image)
@@ -52,10 +45,7 @@ async def predict(file: UploadFile = File(...)):
 
     prob = float(prediction[0][0])
 
-    if prob > 0.5:
-        label = "Defective Disc"
-    else:
-        label = "Normal Disc"
+    label = "Defective Disc" if prob > 0.5 else "Normal Disc"
 
     return {
         "prediction": label,
