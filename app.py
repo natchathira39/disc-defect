@@ -1,56 +1,101 @@
-import os
-import gdown
-import numpy as np
-import tensorflow as tf
 from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+import tensorflow as tf
 from PIL import Image
+import numpy as np
 import io
+import gdown
+import os
+import json
 
-app = FastAPI(title="Disc Brake Defect Detection API")
+app = FastAPI()
 
-MODEL_PATH = "disc_brake_final_fixed.h5"
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-MODEL_URL ="https://drive.google.com/uc?id=1o7V9fmgQzCVRct1TOaZb8D5-170_YkQH"
+MODEL_PATH         = "disc_brake_deploy_final.h5"
+CLASS_INDICES_PATH = "class_indices.json"
+MODEL_URL          = "https://drive.google.com/uc?id=1thCV6xlGiW5hPfOom1qRnuRbrZ-Ypym5"
+CLASS_INDICES_URL  = "https://drive.google.com/uc?id=1b1KHPfPde4v_PU6LPChw4WUYSJeJzKye"
 
-# Download model if not present
-if not os.path.exists(MODEL_PATH):
-    print("Downloading model from Google Drive...")
-    gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+def load_resources():
+    if not os.path.exists(MODEL_PATH):
+        print("Downloading model from Google Drive...")
+        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+        print("Model downloaded!")
 
-print("Loading model...")
-model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+    if not os.path.exists(CLASS_INDICES_PATH):
+        print("Downloading class indices from Google Drive...")
+        gdown.download(CLASS_INDICES_URL, CLASS_INDICES_PATH, quiet=False)
+        print("Class indices downloaded!")
 
-IMG_SIZE = 128
+    print("Loading model...")
+    model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+    print("Model loaded successfully!")
 
+    with open(CLASS_INDICES_PATH, 'r') as f:
+        class_indices = json.load(f)
+    idx_to_class = {v: k for k, v in class_indices.items()}
+    print("Class indices loaded!")
 
-def preprocess_image(image):
-    image = image.resize((IMG_SIZE, IMG_SIZE))
-    image = np.array(image) / 255.0
-    image = np.expand_dims(image, axis=0)
-    return image
+    return model, idx_to_class
 
+model, idx_to_class = load_resources()
 
 @app.get("/")
 def home():
-    return {"message": "Disc Brake Defect Detection API Running"}
-
+    return {
+        "status": "online",
+        "message": "Disc Brake Defect Detection API",
+        "version": "1.0",
+        "classes": list(idx_to_class.values())
+    }
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        img = Image.open(io.BytesIO(contents))
 
-    contents = await file.read()
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
 
-    image = Image.open(io.BytesIO(contents)).convert("RGB")
+        img       = img.resize((128, 128))
+        img_array = np.array(img) / 255.0
+        img_array = np.expand_dims(img_array, axis=0)
 
-    img = preprocess_image(image)
+        predictions = model.predict(img_array, verbose=0)[0]
+        pred_idx    = int(np.argmax(predictions))
+        pred_class  = idx_to_class[pred_idx]
+        confidence  = float(predictions[pred_idx]) * 100
 
-    prediction = model.predict(img)
+        all_probs = {
+            idx_to_class[i]: round(float(predictions[i]) * 100, 2)
+            for i in range(len(predictions))
+        }
 
-    prob = float(prediction[0][0])
+        return {
+            "prediction":        pred_class,
+            "confidence":        round(confidence, 2),
+            "is_defective":      pred_class != "undefective",
+            "all_probabilities": all_probs
+        }
 
-    label = "Defective Disc Brake" if prob > 0.5 else "Normal Disc Brake"
+    except Exception as e:
+        return {
+            "error":      str(e),
+            "prediction": "ERROR",
+            "confidence": 0
+        }
 
+@app.get("/health")
+def health_check():
     return {
-        "prediction": label,
-        "confidence": prob
+        "status":       "healthy",
+        "model_loaded": model is not None,
+        "classes":      list(idx_to_class.values())
     }
