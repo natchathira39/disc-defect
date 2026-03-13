@@ -1,8 +1,9 @@
 fastapi
 uvicorn
-tensorflow==2.12.0
-keras==2.12.0
+tensorflow==2.10.1
+keras==2.10.0
 numpy
 pillow
 python-multipart
 gdown
+h5py
